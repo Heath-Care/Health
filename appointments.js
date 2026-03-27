@@ -1,75 +1,43 @@
 // appointments.js
-// Appointment system — stores appointments per logged-in user.
+// Appointment persistence — stores appointments per logged-in user.
+// Uses the key  hc_appointments_<email>  so each account is isolated.
+// The full rich appointment object is stored:
+//   { id, doctor, spec, hospital, day, mon, time, dateRaw }
 
-/**
- * Books an appointment for the current user.
- * @param {string} name  - Doctor / appointment name
- * @param {string} date  - Date string (e.g. "2026-04-10")
- * @param {string} time  - Optional time string (e.g. "10:30 AM")
- */
-function bookAppointment(name, date, time) {
-  if (!name || !date) {
-    alert('Please provide both a name and a date for the appointment.');
-    return false;
-  }
-
-  const user = (typeof getCurrentUser === 'function') ? getCurrentUser() : null;
-  const userKey = user ? user.email : 'guest';
-  const storageKey = 'appointments_' + userKey;
-
-  const appointments = _getAppointments(storageKey);
-
-  // Prevent exact duplicate
-  const exists = appointments.find(a => a.name === name && a.date === date);
-  if (exists) {
-    alert('An appointment with this name and date already exists.');
-    return false;
-  }
-
-  appointments.push({
-    id: Date.now(),
-    name,
-    date,
-    time: time || '',
-    createdAt: new Date().toISOString()
-  });
-
-  localStorage.setItem(storageKey, JSON.stringify(appointments));
-  return true;
+function _apptKey() {
+  const user = (typeof currentUser !== 'undefined' && currentUser) ? currentUser : null;
+  return 'hc_appointments_' + (user ? user.email : 'guest');
 }
 
-/**
- * Returns all appointments for the current user (newest first).
- */
-function getAppointments() {
-  const user = (typeof getCurrentUser === 'function') ? getCurrentUser() : null;
-  const userKey = user ? user.email : 'guest';
-  return _getAppointments('appointments_' + userKey)
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-}
-
-/**
- * Cancels (removes) an appointment by its id.
- * @param {number} id
- */
-function cancelAppointment(id) {
-  const user = (typeof getCurrentUser === 'function') ? getCurrentUser() : null;
-  const userKey = user ? user.email : 'guest';
-  const storageKey = 'appointments_' + userKey;
-
-  const appointments = _getAppointments(storageKey).filter(a => a.id !== id);
-  localStorage.setItem(storageKey, JSON.stringify(appointments));
-}
-
-/** Internal helper — safely reads appointments array from localStorage. */
-function _getAppointments(key) {
+function loadUserAppointments() {
   try {
-    return JSON.parse(localStorage.getItem(key) || '[]');
+    const raw = localStorage.getItem(_apptKey());
+    return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
   }
 }
 
-window.bookAppointment   = bookAppointment;
-window.getAppointments   = getAppointments;
-window.cancelAppointment = cancelAppointment;
+function saveUserAppointments(appts) {
+  try {
+    localStorage.setItem(_apptKey(), JSON.stringify(appts));
+  } catch(e) {}
+}
+
+function addUserAppointment(appt) {
+  const appts = loadUserAppointments();
+  appt.id = appt.id || (Date.now() + Math.random());
+  appts.push(appt);
+  saveUserAppointments(appts);
+}
+
+function removeUserAppointment(idx) {
+  const appts = loadUserAppointments();
+  appts.splice(idx, 1);
+  saveUserAppointments(appts);
+}
+
+window.loadUserAppointments  = loadUserAppointments;
+window.saveUserAppointments  = saveUserAppointments;
+window.addUserAppointment    = addUserAppointment;
+window.removeUserAppointment = removeUserAppointment;
